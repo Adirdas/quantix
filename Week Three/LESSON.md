@@ -1,4 +1,4 @@
-# Week 3 — Indicators and Features
+ Week 3 — Indicators and Features
 
 ## Goals
 
@@ -24,3 +24,4 @@ plt.show()
 ## Outcome
 
 Raw prices become features for modelling.
+#
