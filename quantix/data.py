@@ -36,6 +36,11 @@ def add_returns_and_sd(df: pd.DataFrame) -> pd.DataFrame:
     df["SD"] = df["Returns"].rolling(window=20).std()
     return df
 
+def add_rolling_features(df, window):
+    df["rolling_mean"] = df["Return"].rolling(window).mean()
+    df["rolling_std"] = df["Return"].rolling(window).std()
+    return df
+
 
 if __name__ == "__main__":
     print("Hello I'm a module")
