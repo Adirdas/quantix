@@ -4,50 +4,6 @@ from pathlib import Path
 from numpy import cumprod
 
 
-def download_stock_data(
-    ticker: str, start: str, end: str, should_save: bool = True, path: str = "../data"
-) -> pd.DataFrame:
-    """
-    This kickass function is going to get stock data from yfinance and return a cleaned DataFrame.
-    """
-    df = yf.download(ticker, start=start, end=end)
-    df.columns = df.columns.droplevel("Ticker")  # if the level is named
-    df = df[["Open", "High", "Low", "Close", "Volume"]]
-    df = df.sort_index()
-    print(f"Data fetched successfully for ticker {ticker} from {start} to {end}.")
-    # Create a directory to save data if it doesn't exist
-    Path(path).mkdir(parents=True, exist_ok=True)
-    if should_save:
-        print(f"Saving data to {path}/{ticker}.csv")
-        # Save the data to a CSV file
-        df.to_csv(f"{path}/{ticker}.csv")
-        print(f"data saved to {path}/{ticker}.csv")
-
-    return df
-
-
-def load_stock_data(ticker: str, path: str = "../data") -> pd.DataFrame:
-    print(f"loading stock data from {path}/{ticker}.csv")
-    df = pd.read_csv(f"{path}/{ticker}.csv", index_col=0, parse_dates=True)
-    return df
-
-
-def add_returns_and_sd(df: pd.DataFrame) -> pd.DataFrame:
-    df["Returns"] = df["Close"].pct_change()
-    df["SD"] = df["Returns"].rolling(window=20).std()
-    return df
-
-def add_rolling_features(df, window):
-    df["rolling_mean"] = df["Return"].rolling(window).mean()
-    df["rolling_std"] = df["Return"].rolling(window).std()
-    return df
-
-
-if __name__ == "__main__":
-    print("Hello I'm a module")
-
-
-
 
 class Backtester:
     def __init__(self, strategy, initial_capital: float = 10000, percent_per_trade: float = 0.1):
@@ -96,4 +52,3 @@ class Backtester:
         # calculate cumulative returns
         self.data["cumulative_strategy_return"] = (1 + self.data["strategy_return"]).cumprod() - 1
         self.data["cumulative_buy_and_hold_return"] = (1 + self.data["Return"]).cumprod() - 1
-
