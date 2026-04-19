@@ -2,25 +2,22 @@
 # Use RSI (Relative Strength Index) which is a popular momentum indicator.
 
 import sys
-from pathlib import Path
-
-# notebook file -> parent folder (adjust parents[n] if needed)
-import sys
 import os
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import yfinance as yf
 import pandas as pd
-from pathlib import Path
 import matplotlib.pyplot as plt
 
-import yfinance as yf
 from quantix.A_Strategy import PullbackStrategy
 from quantix.A_BackTest import Backtester
 
 ticker = "TSLA"
 data = yf.download(ticker, start="2025-01-01", end="2026-01-01", auto_adjust=False)
+
+if isinstance(data.columns, pd.MultiIndex):
+    data.columns = data.columns.droplevel("Ticker")
 
 data = data[["Open", "High", "Low", "Close", "Volume"]].dropna()
 
