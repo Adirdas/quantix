@@ -53,7 +53,7 @@ class PullbackStrategy:
         uptrend = self.data["Close"] > self.data["MA200"]
         above_ma50 = self.data["Close"] > self.data["MA50"]
         rsi_cross_above_40 = (self.data["RSI"].shift(1) <= 40) & (self.data["RSI"] > 40)
-        
+
         rsi_overbought = self.data["RSI"] > 70
         below_ma50 = self.data["Close"] < self.data["MA50"]
 
