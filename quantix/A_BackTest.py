@@ -9,6 +9,8 @@
 # of the strategy, and make the numbers easier to understand.
 
 
+from signal import signal
+
 import pandas as pd
 
 
@@ -18,9 +20,34 @@ class Backtester:
     ):
         self.strategy = strategy
         self.data = strategy.data.copy()
+        self.capital = initial_capital
         self.initial_capital = initial_capital
         self.percent_per_trade = percent_per_trade
         self.trades = []
+
+    def exit_positions(self, current_price, reason):
+        for trade in self.trades:
+            if trade["exit_price"] is None:  # only exit open trades
+                trade["exit_price"] = current_price
+                trade["return"] = (trade["exit_price"] - trade["entry_price"]) / trade[
+                    "entry_price"
+                ]
+                trade["reason"] = reason
+                self.portfoloio_value += trade["exit_price"] * trade["num_shares"]
+
+    def check_stop_loss(self, current_price):
+        for trade in self.trades:
+            if (
+                trade["stop_loss"] is not None
+                and current_price <= trade["stop_loss"]
+                and trade["exit_price"] is None
+            ):
+                trade["exit_price"] = current_price
+                trade["return"] = (trade["exit_price"] - trade["entry_price"]) / trade[
+                    "entry_price"
+                ]
+                trade["reason"] = "stop_loss"
+                self.portfoloio_value += trade["exit_price"] * trade["num_shares"]
 
     def backtest(self, stop_loss_pct: float = 0.10):
         # then when running the code we can set our own stop loss
@@ -37,83 +64,58 @@ class Backtester:
         position = 0
         entry_price = None
         entry_date = None
+        today_close = None
 
         for i in range(1, len(self.data)):
             today_close = self.data["Close"].iloc[i]
             today_open = self.data["Open"].iloc[i]
             previous_signal = self.data["signal"].iloc[i - 1]
 
-            if position == 0:
-                if previous_signal == 1:
-                    position = 1
-                    entry_price = today_open
-                    entry_date = self.data.index[i]
+            if previous_signal == 1 & self.capital > 0:
+                position = 1
+                entry_price = today_open
+                entry_date = self.data.index[i]
+                amount_to_invest = self.capital * self.percent_per_trade
+                num_shares = amount_to_invest // entry_price
+                self.capital -= num_shares * entry_price
+                self.trades.append(
+                    {
+                        "entry_date": entry_date,
+                        "entry_price": entry_price,
+                        "exit_date": None,
+                        "exit_price": None,
+                        "return": None,
+                        "reason": None,
+                        "num_shares": num_shares,
+                        "stop_loss": entry_price * (1 - stop_loss_pct),
+                        "capital_invested": num_shares * entry_price,
+                    }
+                )
 
-                    self.trades.append(
-                        {
-                            "entry_date": entry_date,
-                            "entry_price": entry_price,
-                            "exit_date": None,
-                            "exit_price": None,
-                            "return": None,
-                            "reason": None,
-                        }
-                    )
+            elif previous_signal == -1 and position == 1:
+                self.exit_positions(today_close, reason="signal_exit")
+                position = 0
 
-            else:
-                stop_price = entry_price * (1 - stop_loss_pct)
-                exit_reason = None
-                exit_price = None
+            self.check_stop_loss(today_close)
 
-                if today_close <= stop_price:
-                    exit_reason = "stop_loss"
-                    exit_price = today_close
-                elif previous_signal == -1:
-                    exit_reason = "signal_exit"
-                    exit_price = today_close
-                elif i == len(self.data) - 1:
-                    exit_reason = "final_bar"
-                    exit_price = today_close
+        # exit any remaining open positions at the end of the backtest
+        self.exit_positions(today_close, reason="end_of_backtest")
 
-                if exit_reason is not None:
-                    trade_return = (exit_price - entry_price) / entry_price
-
-                    self.trades[-1]["exit_date"] = self.data.index[i]
-                    self.trades[-1]["exit_price"] = exit_price
-                    self.trades[-1]["return"] = trade_return
-                    self.trades[-1]["reason"] = exit_reason
-
-                    position = 0
-                    entry_price = None
-                    entry_date = None
-
-            self.data.loc[self.data.index[i], "position"] = position
-
-        self.data["strategy_return"] = self.data["Return"] * self.data[
-            "position"
-        ].shift(1).fillna(0)
-        self.data["cumulative_strategy_return"] = (
-            1 + self.data["strategy_return"]
-        ).cumprod() - 1
-        self.data["cumulative_buy_and_hold_return"] = (
-            1 + self.data["Return"]
-        ).cumprod() - 1
+        self.data["strategy_return"] = self.capital / self.initial_capital - 1
 
         return self.data
 
     def stats(self):
-        closed_trades = [t for t in self.trades if t["return"] is not None]
-        if not closed_trades:
-            return {}
 
-        returns = pd.Series([t["return"] for t in closed_trades])
+        returns = pd.Series(
+            [t["return"] for t in self.trades if t["return"] is not None]
+        )
 
         return {
-            "num_trades": len(closed_trades),
+            "num_trades": len(self.trades),
             "win_rate": (returns > 0).mean(),
             "avg_trade_return": returns.mean(),
             "best_trade": returns.max(),
             "worst_trade": returns.min(),
-            "total_strategy_return": self.data["cumulative_strategy_return"].iloc[-1],
-            "buy_and_hold_return": self.data["cumulative_buy_and_hold_return"].iloc[-1],
+            "total_strategy_return": self.data["strategy_return"].iloc[-1],
         }

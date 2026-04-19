@@ -28,15 +28,5 @@ bt = Backtester(strategy)
 results = bt.backtest(stop_loss_pct=0.08)
 
 print(bt.stats())
-print(
-    results[
-        [
-            "Close",
-            "signal",
-            "position",
-            "cumulative_strategy_return",
-            "cumulative_buy_and_hold_return",
-        ]
-    ].tail()
-)
+print(results[["Close", "signal", "position", "strategy_return"]].tail())
 print(bt.trades[-5:])
